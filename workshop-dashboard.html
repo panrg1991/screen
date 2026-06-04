@@ -1,0 +1,1281 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>车间设备智能看板</title>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.7/dist/chart.umd.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chartjs-plugin-datalabels@2.2.0/dist/chartjs-plugin-datalabels.min.js"></script>
+    <style>
+        /* ===== 基础重置与变量 ===== */
+        :root {
+            --bg-primary: #0a0e27;
+            --bg-secondary: #111638;
+            --bg-card: #161b40;
+            --bg-card-hover: #1c2250;
+            --border-color: rgba(56, 189, 248, 0.15);
+            --border-glow: rgba(56, 189, 248, 0.3);
+            --text-primary: #e2e8f0;
+            --text-secondary: #94a3b8;
+            --text-muted: #64748b;
+            --accent-blue: #38bdf8;
+            --accent-cyan: #22d3ee;
+            --accent-green: #34d399;
+            --accent-yellow: #fbbf24;
+            --accent-orange: #fb923c;
+            --accent-red: #f87171;
+            --accent-purple: #a78bfa;
+            --gradient-blue: linear-gradient(135deg, #38bdf8, #818cf8);
+            --gradient-green: linear-gradient(135deg, #34d399, #22d3ee);
+            --gradient-orange: linear-gradient(135deg, #fb923c, #fbbf24);
+            --gradient-red: linear-gradient(135deg, #f87171, #fb923c);
+            --shadow-card: 0 4px 24px rgba(0, 0, 0, 0.3), 0 0 1px rgba(56, 189, 248, 0.1);
+            --shadow-glow: 0 0 20px rgba(56, 189, 248, 0.08);
+        }
+
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", "PingFang SC", "Microsoft YaHei", sans-serif;
+            background: var(--bg-primary);
+            color: var(--text-primary);
+            min-height: 100vh;
+            overflow-x: hidden;
+        }
+
+        /* ===== 动态背景 ===== */
+        body::before {
+            content: '';
+            position: fixed;
+            top: 0; left: 0;
+            width: 100%; height: 100%;
+            background:
+                radial-gradient(ellipse at 20% 50%, rgba(56, 189, 248, 0.05) 0%, transparent 50%),
+                radial-gradient(ellipse at 80% 20%, rgba(99, 102, 241, 0.05) 0%, transparent 50%),
+                radial-gradient(ellipse at 50% 80%, rgba(34, 211, 238, 0.04) 0%, transparent 50%);
+            pointer-events: none;
+            z-index: 0;
+        }
+
+        /* ===== 顶部导航 ===== */
+        .dashboard-header {
+            position: relative;
+            z-index: 10;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            padding: 16px 32px;
+            background: linear-gradient(180deg, rgba(17, 22, 56, 0.95) 0%, rgba(17, 22, 56, 0.7) 100%);
+            border-bottom: 1px solid var(--border-color);
+            backdrop-filter: blur(12px);
+        }
+
+        .header-left {
+            display: flex;
+            align-items: center;
+            gap: 16px;
+        }
+
+        .header-logo {
+            width: 40px; height: 40px;
+            border-radius: 10px;
+            background: var(--gradient-blue);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 20px;
+            box-shadow: 0 0 16px rgba(56, 189, 248, 0.3);
+        }
+
+        .header-title {
+            font-size: 22px;
+            font-weight: 700;
+            background: linear-gradient(90deg, #e2e8f0, #38bdf8);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            letter-spacing: 2px;
+        }
+
+        .header-subtitle {
+            font-size: 12px;
+            color: var(--text-muted);
+            margin-top: 2px;
+            letter-spacing: 1px;
+        }
+
+        .header-center {
+            display: flex;
+            align-items: center;
+            gap: 24px;
+        }
+
+        .status-dot {
+            width: 8px; height: 8px;
+            border-radius: 50%;
+            background: var(--accent-green);
+            box-shadow: 0 0 8px rgba(52, 211, 153, 0.6);
+            animation: pulse-dot 2s ease-in-out infinite;
+        }
+
+        @keyframes pulse-dot {
+            0%, 100% { opacity: 1; }
+            50% { opacity: 0.5; }
+        }
+
+        .status-text {
+            font-size: 13px;
+            color: var(--accent-green);
+            display: flex;
+            align-items: center;
+            gap: 6px;
+        }
+
+        .header-right {
+            display: flex;
+            align-items: center;
+            gap: 20px;
+            font-size: 14px;
+            color: var(--text-secondary);
+        }
+
+        .header-time {
+            font-size: 20px;
+            font-weight: 600;
+            color: var(--accent-cyan);
+            font-variant-numeric: tabular-nums;
+        }
+
+        .header-date {
+            font-size: 13px;
+            color: var(--text-muted);
+        }
+
+        /* ===== 主内容区 ===== */
+        .dashboard-body {
+            position: relative;
+            z-index: 10;
+            padding: 20px 24px;
+            display: flex;
+            flex-direction: column;
+            gap: 20px;
+        }
+
+        /* ===== KPI 卡片行 ===== */
+        .kpi-row {
+            display: grid;
+            grid-template-columns: repeat(5, 1fr);
+            gap: 16px;
+        }
+
+        .kpi-card {
+            background: var(--bg-card);
+            border: 1px solid var(--border-color);
+            border-radius: 14px;
+            padding: 20px;
+            position: relative;
+            overflow: hidden;
+            transition: all 0.3s ease;
+            box-shadow: var(--shadow-card);
+        }
+
+        .kpi-card:hover {
+            border-color: var(--border-glow);
+            transform: translateY(-2px);
+            box-shadow: var(--shadow-card), var(--shadow-glow);
+        }
+
+        .kpi-card::before {
+            content: '';
+            position: absolute;
+            top: 0; left: 0;
+            width: 100%; height: 3px;
+        }
+
+        .kpi-card.blue::before { background: var(--gradient-blue); }
+        .kpi-card.green::before { background: var(--gradient-green); }
+        .kpi-card.orange::before { background: var(--gradient-orange); }
+        .kpi-card.red::before { background: var(--gradient-red); }
+        .kpi-card.purple::before { background: linear-gradient(135deg, #a78bfa, #818cf8); }
+
+        .kpi-icon {
+            width: 44px; height: 44px;
+            border-radius: 12px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 22px;
+            margin-bottom: 14px;
+        }
+
+        .kpi-card.blue .kpi-icon { background: rgba(56, 189, 248, 0.12); }
+        .kpi-card.green .kpi-icon { background: rgba(52, 211, 153, 0.12); }
+        .kpi-card.orange .kpi-icon { background: rgba(251, 191, 36, 0.12); }
+        .kpi-card.red .kpi-icon { background: rgba(248, 113, 113, 0.12); }
+        .kpi-card.purple .kpi-icon { background: rgba(167, 139, 250, 0.12); }
+
+        .kpi-label {
+            font-size: 13px;
+            color: var(--text-muted);
+            margin-bottom: 8px;
+            letter-spacing: 0.5px;
+        }
+
+        .kpi-value {
+            font-size: 30px;
+            font-weight: 700;
+            font-variant-numeric: tabular-nums;
+            line-height: 1;
+        }
+
+        .kpi-card.blue .kpi-value { color: var(--accent-blue); }
+        .kpi-card.green .kpi-value { color: var(--accent-green); }
+        .kpi-card.orange .kpi-value { color: var(--accent-yellow); }
+        .kpi-card.red .kpi-value { color: var(--accent-red); }
+        .kpi-card.purple .kpi-value { color: var(--accent-purple); }
+
+        .kpi-unit {
+            font-size: 14px;
+            font-weight: 400;
+            color: var(--text-muted);
+            margin-left: 4px;
+        }
+
+        .kpi-change {
+            display: inline-flex;
+            align-items: center;
+            gap: 3px;
+            margin-top: 10px;
+            font-size: 12px;
+            padding: 2px 8px;
+            border-radius: 6px;
+        }
+
+        .kpi-change.up {
+            color: var(--accent-green);
+            background: rgba(52, 211, 153, 0.1);
+        }
+
+        .kpi-change.down {
+            color: var(--accent-red);
+            background: rgba(248, 113, 113, 0.1);
+        }
+
+        /* ===== 图表区行 ===== */
+        .charts-row {
+            display: grid;
+            gap: 16px;
+        }
+
+        .charts-row.two-col {
+            grid-template-columns: 1.2fr 0.8fr;
+        }
+
+        .charts-row.three-col {
+            grid-template-columns: 1fr 1fr 1fr;
+        }
+
+        .chart-card {
+            background: var(--bg-card);
+            border: 1px solid var(--border-color);
+            border-radius: 14px;
+            padding: 20px;
+            box-shadow: var(--shadow-card);
+            transition: all 0.3s ease;
+        }
+
+        .chart-card:hover {
+            border-color: var(--border-glow);
+        }
+
+        .chart-header {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            margin-bottom: 16px;
+        }
+
+        .chart-title {
+            font-size: 15px;
+            font-weight: 600;
+            color: var(--text-primary);
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .chart-title-dot {
+            width: 6px; height: 6px;
+            border-radius: 50%;
+            background: var(--accent-blue);
+        }
+
+        .chart-badge {
+            font-size: 11px;
+            padding: 3px 10px;
+            border-radius: 8px;
+            background: rgba(56, 189, 248, 0.1);
+            color: var(--accent-blue);
+            border: 1px solid rgba(56, 189, 248, 0.2);
+        }
+
+        .chart-container {
+            position: relative;
+            width: 100%;
+        }
+
+        /* ===== 设备状态表格 ===== */
+        .equipment-table {
+            width: 100%;
+            border-collapse: separate;
+            border-spacing: 0;
+        }
+
+        .equipment-table thead th {
+            background: rgba(56, 189, 248, 0.06);
+            color: var(--text-muted);
+            font-size: 12px;
+            font-weight: 500;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+            padding: 10px 12px;
+            text-align: left;
+            border-bottom: 1px solid var(--border-color);
+        }
+
+        .equipment-table thead th:first-child {
+            border-radius: 8px 0 0 0;
+        }
+
+        .equipment-table thead th:last-child {
+            border-radius: 0 8px 0 0;
+        }
+
+        .equipment-table tbody td {
+            padding: 10px 12px;
+            font-size: 13px;
+            border-bottom: 1px solid rgba(56, 189, 248, 0.05);
+            color: var(--text-secondary);
+        }
+
+        .equipment-table tbody tr:hover {
+            background: rgba(56, 189, 248, 0.03);
+        }
+
+        .equipment-table tbody tr:last-child td {
+            border-bottom: none;
+        }
+
+        .status-badge {
+            display: inline-flex;
+            align-items: center;
+            gap: 5px;
+            padding: 3px 10px;
+            border-radius: 6px;
+            font-size: 12px;
+            font-weight: 500;
+        }
+
+        .status-badge.running {
+            background: rgba(52, 211, 153, 0.12);
+            color: var(--accent-green);
+        }
+
+        .status-badge.idle {
+            background: rgba(251, 191, 36, 0.12);
+            color: var(--accent-yellow);
+        }
+
+        .status-badge.fault {
+            background: rgba(248, 113, 113, 0.12);
+            color: var(--accent-red);
+        }
+
+        .status-badge.maintenance {
+            background: rgba(167, 139, 250, 0.12);
+            color: var(--accent-purple);
+        }
+
+        .status-badge::before {
+            content: '';
+            width: 6px; height: 6px;
+            border-radius: 50%;
+            background: currentColor;
+        }
+
+        .status-badge.running::before {
+            animation: pulse-dot 1.5s ease-in-out infinite;
+        }
+
+        /* ===== 报警列表 ===== */
+        .alarm-list {
+            display: flex;
+            flex-direction: column;
+            gap: 8px;
+            max-height: 320px;
+            overflow-y: auto;
+        }
+
+        .alarm-list::-webkit-scrollbar {
+            width: 4px;
+        }
+
+        .alarm-list::-webkit-scrollbar-track {
+            background: transparent;
+        }
+
+        .alarm-list::-webkit-scrollbar-thumb {
+            background: rgba(56, 189, 248, 0.2);
+            border-radius: 4px;
+        }
+
+        .alarm-item {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            padding: 10px 14px;
+            border-radius: 10px;
+            background: rgba(0, 0, 0, 0.2);
+            border: 1px solid transparent;
+            transition: all 0.2s ease;
+        }
+
+        .alarm-item:hover {
+            background: rgba(0, 0, 0, 0.3);
+        }
+
+        .alarm-item.critical {
+            border-left: 3px solid var(--accent-red);
+        }
+
+        .alarm-item.warning {
+            border-left: 3px solid var(--accent-orange);
+        }
+
+        .alarm-item.info {
+            border-left: 3px solid var(--accent-blue);
+        }
+
+        .alarm-level {
+            font-size: 11px;
+            padding: 2px 8px;
+            border-radius: 4px;
+            font-weight: 600;
+            white-space: nowrap;
+        }
+
+        .alarm-level.critical {
+            background: rgba(248, 113, 113, 0.15);
+            color: var(--accent-red);
+        }
+
+        .alarm-level.warning {
+            background: rgba(251, 146, 60, 0.15);
+            color: var(--accent-orange);
+        }
+
+        .alarm-level.info {
+            background: rgba(56, 189, 248, 0.15);
+            color: var(--accent-blue);
+        }
+
+        .alarm-content {
+            flex: 1;
+            min-width: 0;
+        }
+
+        .alarm-text {
+            font-size: 13px;
+            color: var(--text-primary);
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+        }
+
+        .alarm-device {
+            font-size: 11px;
+            color: var(--text-muted);
+            margin-top: 2px;
+        }
+
+        .alarm-time {
+            font-size: 11px;
+            color: var(--text-muted);
+            white-space: nowrap;
+        }
+
+        /* ===== 进度条 ===== */
+        .progress-bar-container {
+            width: 100%;
+            height: 6px;
+            background: rgba(255, 255, 255, 0.06);
+            border-radius: 3px;
+            overflow: hidden;
+        }
+
+        .progress-bar-fill {
+            height: 100%;
+            border-radius: 3px;
+            transition: width 1s ease;
+        }
+
+        .progress-bar-fill.green { background: var(--gradient-green); }
+        .progress-bar-fill.blue { background: var(--gradient-blue); }
+        .progress-bar-fill.orange { background: var(--gradient-orange); }
+        .progress-bar-fill.red { background: var(--gradient-red); }
+
+        /* ===== 底部行 ===== */
+        .bottom-row {
+            display: grid;
+            grid-template-columns: 1fr 1fr 0.8fr;
+            gap: 16px;
+        }
+
+        /* ===== 动画 ===== */
+        @keyframes fade-in-up {
+            from {
+                opacity: 0;
+                transform: translateY(16px);
+            }
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
+        }
+
+        .kpi-card, .chart-card {
+            animation: fade-in-up 0.6s ease both;
+        }
+
+        .kpi-card:nth-child(1) { animation-delay: 0s; }
+        .kpi-card:nth-child(2) { animation-delay: 0.08s; }
+        .kpi-card:nth-child(3) { animation-delay: 0.16s; }
+        .kpi-card:nth-child(4) { animation-delay: 0.24s; }
+        .kpi-card:nth-child(5) { animation-delay: 0.32s; }
+
+        /* ===== 完成率环形图文字 ===== */
+        .gauge-wrapper {
+            display: flex;
+            justify-content: center;
+            align-items: center;
+        }
+
+        /* ===== 响应式 ===== */
+        @media (max-width: 1400px) {
+            .kpi-row {
+                grid-template-columns: repeat(3, 1fr);
+            }
+            .bottom-row {
+                grid-template-columns: 1fr 1fr;
+            }
+        }
+
+        @media (max-width: 1024px) {
+            .kpi-row {
+                grid-template-columns: repeat(2, 1fr);
+            }
+            .charts-row.two-col,
+            .charts-row.three-col {
+                grid-template-columns: 1fr;
+            }
+            .bottom-row {
+                grid-template-columns: 1fr;
+            }
+        }
+
+        /* ===== 扫描线动画 ===== */
+        .scan-line {
+            position: fixed;
+            top: 0; left: 0;
+            width: 100%; height: 2px;
+            background: linear-gradient(90deg, transparent, rgba(56, 189, 248, 0.15), transparent);
+            animation: scan 6s linear infinite;
+            pointer-events: none;
+            z-index: 999;
+        }
+
+        @keyframes scan {
+            0% { top: 0; }
+            100% { top: 100%; }
+        }
+
+        /* 数字翻牌动画 */
+        .kpi-value {
+            display: inline-block;
+        }
+    </style>
+</head>
+<body>
+    <!-- 扫描线 -->
+    <div class="scan-line"></div>
+
+    <!-- 顶部导航 -->
+    <header class="dashboard-header">
+        <div class="header-left">
+            <div class="header-logo">🏭</div>
+            <div>
+                <div class="header-title">智能车间设备监控看板</div>
+                <div class="header-subtitle">SMART WORKSHOP EQUIPMENT MONITORING</div>
+            </div>
+        </div>
+        <div class="header-center">
+            <div class="status-text">
+                <span class="status-dot"></span>
+                系统运行正常
+            </div>
+        </div>
+        <div class="header-right">
+            <div>
+                <div class="header-date" id="currentDate"></div>
+                <div class="header-time" id="currentTime"></div>
+            </div>
+        </div>
+    </header>
+
+    <!-- 主体 -->
+    <div class="dashboard-body">
+        <!-- KPI 指标行 -->
+        <div class="kpi-row">
+            <div class="kpi-card blue">
+                <div class="kpi-icon">📦</div>
+                <div class="kpi-label">今日总产量</div>
+                <div class="kpi-value" id="kpiProduction">12,847<span class="kpi-unit">件</span></div>
+                <div class="kpi-change up">▲ 8.3% 较昨日</div>
+            </div>
+            <div class="kpi-card green">
+                <div class="kpi-icon">✅</div>
+                <div class="kpi-label">平均完成率</div>
+                <div class="kpi-value" id="kpiCompletion">94.6<span class="kpi-unit">%</span></div>
+                <div class="kpi-change up">▲ 2.1% 较昨日</div>
+            </div>
+            <div class="kpi-card purple">
+                <div class="kpi-icon">🏅</div>
+                <div class="kpi-label">平均合格率</div>
+                <div class="kpi-value" id="kpiQualified">98.2<span class="kpi-unit">%</span></div>
+                <div class="kpi-change up">▲ 0.5% 较昨日</div>
+            </div>
+            <div class="kpi-card orange">
+                <div class="kpi-icon">⚙️</div>
+                <div class="kpi-label">设备稼动率</div>
+                <div class="kpi-value" id="kpiOEE">87.3<span class="kpi-unit">%</span></div>
+                <div class="kpi-change down">▼ 1.2% 较昨日</div>
+            </div>
+            <div class="kpi-card red">
+                <div class="kpi-icon">🚨</div>
+                <div class="kpi-label">今日报警</div>
+                <div class="kpi-value" id="kpiAlarm">7<span class="kpi-unit">次</span></div>
+                <div class="kpi-change down">▲ 3 较昨日</div>
+            </div>
+        </div>
+
+        <!-- 第二行：产量趋势 + 完成率/合格率 -->
+        <div class="charts-row two-col">
+            <div class="chart-card">
+                <div class="chart-header">
+                    <div class="chart-title">
+                        <span class="chart-title-dot"></span>
+                        近7日产量趋势
+                    </div>
+                    <span class="chart-badge">实时更新</span>
+                </div>
+                <div class="chart-container" style="height: 280px;">
+                    <canvas id="productionTrendChart"></canvas>
+                </div>
+            </div>
+            <div class="chart-card">
+                <div class="chart-header">
+                    <div class="chart-title">
+                        <span class="chart-title-dot"></span>
+                        各产线完成率与合格率
+                    </div>
+                    <span class="chart-badge">今日数据</span>
+                </div>
+                <div class="chart-container" style="height: 280px;">
+                    <canvas id="rateCompareChart"></canvas>
+                </div>
+            </div>
+        </div>
+
+        <!-- 第三行：设备产量对比 + 合格率分布 + 报警统计 -->
+        <div class="charts-row three-col">
+            <div class="chart-card">
+                <div class="chart-header">
+                    <div class="chart-title">
+                        <span class="chart-title-dot"></span>
+                        各设备今日产量
+                    </div>
+                </div>
+                <div class="chart-container" style="height: 260px;">
+                    <canvas id="equipmentOutputChart"></canvas>
+                </div>
+            </div>
+            <div class="chart-card">
+                <div class="chart-header">
+                    <div class="chart-title">
+                        <span class="chart-title-dot"></span>
+                        合格率分布
+                    </div>
+                </div>
+                <div class="chart-container" style="height: 260px;">
+                    <canvas id="qualityDistributionChart"></canvas>
+                </div>
+            </div>
+            <div class="chart-card">
+                <div class="chart-header">
+                    <div class="chart-title">
+                        <span class="chart-title-dot"></span>
+                        报警类型统计
+                    </div>
+                </div>
+                <div class="chart-container" style="height: 260px;">
+                    <canvas id="alarmTypeChart"></canvas>
+                </div>
+            </div>
+        </div>
+
+        <!-- 底部行：设备状态表 + 报警列表 + OEE -->
+        <div class="bottom-row">
+            <div class="chart-card">
+                <div class="chart-header">
+                    <div class="chart-title">
+                        <span class="chart-title-dot"></span>
+                        设备运行状态
+                    </div>
+                    <span class="chart-badge" id="deviceCount">8 台设备</span>
+                </div>
+                <div style="max-height: 310px; overflow-y: auto;">
+                    <table class="equipment-table">
+                        <thead>
+                            <tr>
+                                <th>设备名称</th>
+                                <th>状态</th>
+                                <th>产量</th>
+                                <th>完成率</th>
+                                <th>合格率</th>
+                            </tr>
+                        </thead>
+                        <tbody id="equipmentTableBody"></tbody>
+                    </table>
+                </div>
+            </div>
+            <div class="chart-card">
+                <div class="chart-header">
+                    <div class="chart-title">
+                        <span class="chart-title-dot"></span>
+                        实时报警记录
+                    </div>
+                    <span class="chart-badge" style="background: rgba(248,113,113,0.1); color: var(--accent-red); border-color: rgba(248,113,113,0.2);">7 条未处理</span>
+                </div>
+                <div class="alarm-list" id="alarmList"></div>
+            </div>
+            <div class="chart-card">
+                <div class="chart-header">
+                    <div class="chart-title">
+                        <span class="chart-title-dot"></span>
+                        设备OEE
+                    </div>
+                </div>
+                <div class="chart-container" style="height: 260px;">
+                    <canvas id="oeeRadarChart"></canvas>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // ===== 时间更新 =====
+        function updateDateTime() {
+            const now = new Date();
+            const dateStr = now.toLocaleDateString('zh-CN', { year: 'numeric', month: '2-digit', day: '2-digit', weekday: 'long' });
+            const timeStr = now.toLocaleTimeString('zh-CN', { hour12: false });
+            document.getElementById('currentDate').textContent = dateStr;
+            document.getElementById('currentTime').textContent = timeStr;
+        }
+        updateDateTime();
+        setInterval(updateDateTime, 1000);
+
+        // ===== 数据集 =====
+        const DAYS = ['周一', '周二', '周三', '周四', '周五', '周六', '周日'];
+
+        const productionData = {
+            labels: DAYS,
+            cnc: [1820, 1750, 1900, 1680, 1950, 1200, 847],
+            injection: [2100, 2050, 2200, 1950, 2300, 1500, 1200],
+            assembly: [1650, 1600, 1700, 1550, 1750, 1100, 900],
+        };
+
+        const lineRateData = {
+            labels: ['CNC加工线', '注塑产线', '装配产线', '焊接产线', '检测产线'],
+            completion: [96.5, 92.3, 94.8, 88.7, 97.1],
+            qualified: [98.8, 97.5, 99.1, 96.3, 99.5],
+        };
+
+        const equipmentData = [
+            { name: 'CNC-01', status: 'running', output: 1850, target: 2000, completion: 92.5, qualified: 98.8 },
+            { name: 'CNC-02', status: 'running', output: 1920, target: 2000, completion: 96.0, qualified: 99.1 },
+            { name: 'CNC-03', status: 'fault', output: 860, target: 2000, completion: 43.0, qualified: 95.2 },
+            { name: 'IM-01', status: 'running', output: 2300, target: 2500, completion: 92.0, qualified: 97.5 },
+            { name: 'IM-02', status: 'idle', output: 1800, target: 2500, completion: 72.0, qualified: 98.2 },
+            { name: 'ASM-01', status: 'running', output: 1750, target: 1800, completion: 97.2, qualified: 99.3 },
+            { name: 'WLD-01', status: 'maintenance', output: 0, target: 1500, completion: 0, qualified: 0 },
+            { name: 'QC-01', status: 'running', output: 4407, target: 4500, completion: 97.9, qualified: 99.5 },
+        ];
+
+        const alarmData = [
+            { level: 'critical', text: 'CNC-03 主轴温度超限报警 (89.5°C)', device: 'CNC-03', time: '14:32:18' },
+            { level: 'critical', text: 'CNC-03 主轴振动异常，已自动停机', device: 'CNC-03', time: '14:35:06' },
+            { level: 'warning', text: 'IM-02 模具温度偏高 (72.3°C)', device: 'IM-02', time: '13:45:22' },
+            { level: 'warning', text: 'IM-02 保压时间超出设定范围', device: 'IM-02', time: '13:48:55' },
+            { level: 'warning', text: 'WLD-01 焊接电流波动 ±5A', device: 'WLD-01', time: '12:20:14' },
+            { level: 'info', text: 'CNC-01 刀具寿命预警 (剩余12%)', device: 'CNC-01', time: '11:05:30' },
+            { level: 'info', text: 'QC-01 检测节拍偏慢 (+3s/件)', device: 'QC-01', time: '10:32:44' },
+        ];
+
+        const alarmTypeData = {
+            labels: ['温度超限', '振动异常', '电流波动', '压力异常', '寿命预警', '节拍偏慢'],
+            values: [2, 1, 1, 1, 1, 1],
+        };
+
+        const qualityDistribution = {
+            labels: ['≥99%', '98%-99%', '97%-98%', '96%-97%', '<96%'],
+            values: [3, 2, 1, 1, 1],
+        };
+
+        const oeeData = {
+            labels: ['可用率', '性能率', '合格率', '稼动率'],
+            current: [92, 88, 98, 87],
+            target: [95, 92, 99, 90],
+        };
+
+        // ===== Chart.js 全局配置 =====
+        Chart.defaults.color = '#94a3b8';
+        Chart.defaults.font.family = '-apple-system, BlinkMacSystemFont, "Segoe UI", "PingFang SC", "Microsoft YaHei", sans-serif';
+        Chart.defaults.font.size = 12;
+        Chart.defaults.plugins.legend.labels.usePointStyle = true;
+        Chart.defaults.plugins.legend.labels.pointStyleWidth = 10;
+
+        // ===== 1. 产量趋势图 =====
+        new Chart(document.getElementById('productionTrendChart'), {
+            type: 'line',
+            data: {
+                labels: productionData.labels,
+                datasets: [
+                    {
+                        label: 'CNC加工线',
+                        data: productionData.cnc,
+                        borderColor: '#38bdf8',
+                        backgroundColor: 'rgba(56, 189, 248, 0.08)',
+                        fill: true,
+                        tension: 0.4,
+                        borderWidth: 2.5,
+                        pointRadius: 4,
+                        pointHoverRadius: 7,
+                        pointBackgroundColor: '#38bdf8',
+                        pointBorderColor: '#0a0e27',
+                        pointBorderWidth: 2,
+                    },
+                    {
+                        label: '注塑产线',
+                        data: productionData.injection,
+                        borderColor: '#34d399',
+                        backgroundColor: 'rgba(52, 211, 153, 0.08)',
+                        fill: true,
+                        tension: 0.4,
+                        borderWidth: 2.5,
+                        pointRadius: 4,
+                        pointHoverRadius: 7,
+                        pointBackgroundColor: '#34d399',
+                        pointBorderColor: '#0a0e27',
+                        pointBorderWidth: 2,
+                    },
+                    {
+                        label: '装配产线',
+                        data: productionData.assembly,
+                        borderColor: '#a78bfa',
+                        backgroundColor: 'rgba(167, 139, 250, 0.08)',
+                        fill: true,
+                        tension: 0.4,
+                        borderWidth: 2.5,
+                        pointRadius: 4,
+                        pointHoverRadius: 7,
+                        pointBackgroundColor: '#a78bfa',
+                        pointBorderColor: '#0a0e27',
+                        pointBorderWidth: 2,
+                    },
+                ],
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                interaction: { mode: 'index', intersect: false },
+                scales: {
+                    x: {
+                        grid: { color: 'rgba(56, 189, 248, 0.05)' },
+                        border: { color: 'rgba(56, 189, 248, 0.1)' },
+                    },
+                    y: {
+                        grid: { color: 'rgba(56, 189, 248, 0.05)' },
+                        border: { color: 'rgba(56, 189, 248, 0.1)' },
+                        beginAtZero: false,
+                        min: 500,
+                    },
+                },
+                plugins: {
+                    tooltip: {
+                        backgroundColor: 'rgba(17, 22, 56, 0.95)',
+                        borderColor: 'rgba(56, 189, 248, 0.2)',
+                        borderWidth: 1,
+                        cornerRadius: 8,
+                        padding: 12,
+                        titleFont: { weight: '600' },
+                        callbacks: {
+                            label: ctx => `${ctx.dataset.label}: ${ctx.parsed.y.toLocaleString()} 件`,
+                        },
+                    },
+                },
+            },
+        });
+
+        // ===== 2. 完成率与合格率对比 =====
+        new Chart(document.getElementById('rateCompareChart'), {
+            type: 'bar',
+            data: {
+                labels: lineRateData.labels,
+                datasets: [
+                    {
+                        label: '完成率',
+                        data: lineRateData.completion,
+                        backgroundColor: 'rgba(56, 189, 248, 0.7)',
+                        borderColor: '#38bdf8',
+                        borderWidth: 1,
+                        borderRadius: 4,
+                        barPercentage: 0.4,
+                        categoryPercentage: 0.7,
+                    },
+                    {
+                        label: '合格率',
+                        data: lineRateData.qualified,
+                        backgroundColor: 'rgba(52, 211, 153, 0.7)',
+                        borderColor: '#34d399',
+                        borderWidth: 1,
+                        borderRadius: 4,
+                        barPercentage: 0.4,
+                        categoryPercentage: 0.7,
+                    },
+                ],
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                scales: {
+                    x: {
+                        grid: { display: false },
+                        border: { color: 'rgba(56, 189, 248, 0.1)' },
+                    },
+                    y: {
+                        grid: { color: 'rgba(56, 189, 248, 0.05)' },
+                        border: { color: 'rgba(56, 189, 248, 0.1)' },
+                        min: 80,
+                        max: 100,
+                        ticks: {
+                            callback: v => v + '%',
+                        },
+                    },
+                },
+                plugins: {
+                    tooltip: {
+                        backgroundColor: 'rgba(17, 22, 56, 0.95)',
+                        borderColor: 'rgba(56, 189, 248, 0.2)',
+                        borderWidth: 1,
+                        cornerRadius: 8,
+                        padding: 12,
+                        callbacks: {
+                            label: ctx => `${ctx.dataset.label}: ${ctx.parsed.y}%`,
+                        },
+                    },
+                },
+            },
+        });
+
+        // ===== 3. 各设备产量 =====
+        const eqNames = equipmentData.map(e => e.name);
+        const eqOutputs = equipmentData.map(e => e.output);
+        const eqTargets = equipmentData.map(e => e.target);
+        const eqColors = equipmentData.map(e => {
+            if (e.status === 'fault') return 'rgba(248, 113, 113, 0.7)';
+            if (e.status === 'idle') return 'rgba(251, 191, 36, 0.7)';
+            if (e.status === 'maintenance') return 'rgba(167, 139, 250, 0.7)';
+            return 'rgba(56, 189, 248, 0.7)';
+        });
+
+        new Chart(document.getElementById('equipmentOutputChart'), {
+            type: 'bar',
+            data: {
+                labels: eqNames,
+                datasets: [
+                    {
+                        label: '实际产量',
+                        data: eqOutputs,
+                        backgroundColor: eqColors,
+                        borderRadius: 4,
+                        barPercentage: 0.6,
+                    },
+                    {
+                        label: '目标产量',
+                        data: eqTargets,
+                        backgroundColor: 'rgba(255, 255, 255, 0.06)',
+                        borderColor: 'rgba(255, 255, 255, 0.12)',
+                        borderWidth: 1,
+                        borderRadius: 4,
+                        barPercentage: 0.6,
+                    },
+                ],
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                indexAxis: 'y',
+                scales: {
+                    x: {
+                        grid: { color: 'rgba(56, 189, 248, 0.05)' },
+                        border: { color: 'rgba(56, 189, 248, 0.1)' },
+                    },
+                    y: {
+                        grid: { display: false },
+                        border: { color: 'rgba(56, 189, 248, 0.1)' },
+                    },
+                },
+                plugins: {
+                    tooltip: {
+                        backgroundColor: 'rgba(17, 22, 56, 0.95)',
+                        borderColor: 'rgba(56, 189, 248, 0.2)',
+                        borderWidth: 1,
+                        cornerRadius: 8,
+                        callbacks: {
+                            label: ctx => `${ctx.dataset.label}: ${ctx.parsed.x.toLocaleString()} 件`,
+                        },
+                    },
+                },
+            },
+        });
+
+        // ===== 4. 合格率分布 =====
+        new Chart(document.getElementById('qualityDistributionChart'), {
+            type: 'doughnut',
+            data: {
+                labels: qualityDistribution.labels,
+                datasets: [{
+                    data: qualityDistribution.values,
+                    backgroundColor: [
+                        'rgba(52, 211, 153, 0.8)',
+                        'rgba(56, 189, 248, 0.8)',
+                        'rgba(167, 139, 250, 0.8)',
+                        'rgba(251, 191, 36, 0.8)',
+                        'rgba(248, 113, 113, 0.8)',
+                    ],
+                    borderColor: '#161b40',
+                    borderWidth: 3,
+                    hoverOffset: 6,
+                }],
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                cutout: '55%',
+                plugins: {
+                    legend: {
+                        position: 'right',
+                        labels: { padding: 12, font: { size: 11 } },
+                    },
+                    tooltip: {
+                        backgroundColor: 'rgba(17, 22, 56, 0.95)',
+                        borderColor: 'rgba(56, 189, 248, 0.2)',
+                        borderWidth: 1,
+                        cornerRadius: 8,
+                        callbacks: {
+                            label: ctx => `${ctx.label}: ${ctx.parsed} 台设备`,
+                        },
+                    },
+                },
+            },
+        });
+
+        // ===== 5. 报警类型统计 =====
+        new Chart(document.getElementById('alarmTypeChart'), {
+            type: 'polarArea',
+            data: {
+                labels: alarmTypeData.labels,
+                datasets: [{
+                    data: alarmTypeData.values,
+                    backgroundColor: [
+                        'rgba(248, 113, 113, 0.6)',
+                        'rgba(251, 146, 60, 0.6)',
+                        'rgba(251, 191, 36, 0.6)',
+                        'rgba(56, 189, 248, 0.6)',
+                        'rgba(167, 139, 250, 0.6)',
+                        'rgba(52, 211, 153, 0.6)',
+                    ],
+                    borderColor: '#161b40',
+                    borderWidth: 2,
+                }],
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                scales: {
+                    r: {
+                        grid: { color: 'rgba(56, 189, 248, 0.06)' },
+                        ticks: { display: false, stepSize: 1 },
+                    },
+                },
+                plugins: {
+                    legend: {
+                        position: 'right',
+                        labels: { padding: 8, font: { size: 10 } },
+                    },
+                    tooltip: {
+                        backgroundColor: 'rgba(17, 22, 56, 0.95)',
+                        borderColor: 'rgba(56, 189, 248, 0.2)',
+                        borderWidth: 1,
+                        cornerRadius: 8,
+                        callbacks: {
+                            label: ctx => `${ctx.label}: ${ctx.parsed.r} 次`,
+                        },
+                    },
+                },
+            },
+        });
+
+        // ===== 6. OEE 雷达图 =====
+        new Chart(document.getElementById('oeeRadarChart'), {
+            type: 'radar',
+            data: {
+                labels: oeeData.labels,
+                datasets: [
+                    {
+                        label: '当前',
+                        data: oeeData.current,
+                        borderColor: '#38bdf8',
+                        backgroundColor: 'rgba(56, 189, 248, 0.12)',
+                        borderWidth: 2,
+                        pointBackgroundColor: '#38bdf8',
+                        pointBorderColor: '#0a0e27',
+                        pointBorderWidth: 2,
+                        pointRadius: 5,
+                    },
+                    {
+                        label: '目标',
+                        data: oeeData.target,
+                        borderColor: '#34d399',
+                        backgroundColor: 'rgba(52, 211, 153, 0.08)',
+                        borderWidth: 2,
+                        borderDash: [5, 5],
+                        pointBackgroundColor: '#34d399',
+                        pointBorderColor: '#0a0e27',
+                        pointBorderWidth: 2,
+                        pointRadius: 4,
+                    },
+                ],
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                scales: {
+                    r: {
+                        min: 70,
+                        max: 100,
+                        grid: { color: 'rgba(56, 189, 248, 0.06)' },
+                        angleLines: { color: 'rgba(56, 189, 248, 0.06)' },
+                        pointLabels: { font: { size: 12 } },
+                        ticks: {
+                            stepSize: 10,
+                            backdropColor: 'transparent',
+                            callback: v => v + '%',
+                        },
+                    },
+                },
+                plugins: {
+                    tooltip: {
+                        backgroundColor: 'rgba(17, 22, 56, 0.95)',
+                        borderColor: 'rgba(56, 189, 248, 0.2)',
+                        borderWidth: 1,
+                        cornerRadius: 8,
+                        callbacks: {
+                            label: ctx => `${ctx.dataset.label}: ${ctx.parsed.r}%`,
+                        },
+                    },
+                },
+            },
+        });
+
+        // ===== 设备状态表格渲染 =====
+        const statusMap = {
+            running: { label: '运行中', class: 'running' },
+            idle: { label: '待机', class: 'idle' },
+            fault: { label: '故障', class: 'fault' },
+            maintenance: { label: '维保中', class: 'maintenance' },
+        };
+
+        const tbody = document.getElementById('equipmentTableBody');
+        equipmentData.forEach(eq => {
+            const s = statusMap[eq.status];
+            const completionColor = eq.completion >= 90 ? 'green' : eq.completion >= 70 ? 'blue' : eq.completion >= 50 ? 'orange' : 'red';
+            const qualifiedColor = eq.qualified >= 98 ? 'green' : eq.qualified >= 96 ? 'blue' : eq.qualified >= 90 ? 'orange' : 'red';
+
+            const tr = document.createElement('tr');
+            tr.innerHTML = `
+                <td style="font-weight: 600; color: var(--text-primary);">${eq.name}</td>
+                <td><span class="status-badge ${s.class}">${s.label}</span></td>
+                <td style="font-variant-numeric: tabular-nums;">${eq.output.toLocaleString()} 件</td>
+                <td>
+                    <div style="display: flex; align-items: center; gap: 8px;">
+                        <div class="progress-bar-container" style="flex: 1;">
+                            <div class="progress-bar-fill ${completionColor}" style="width: ${Math.min(eq.completion, 100)}%;"></div>
+                        </div>
+                        <span style="font-size: 12px; font-variant-numeric: tabular-nums; min-width: 42px; text-align: right;">${eq.completion}%</span>
+                    </div>
+                </td>
+                <td>
+                    <div style="display: flex; align-items: center; gap: 8px;">
+                        <div class="progress-bar-container" style="flex: 1;">
+                            <div class="progress-bar-fill ${qualifiedColor}" style="width: ${Math.min(eq.qualified, 100)}%;"></div>
+                        </div>
+                        <span style="font-size: 12px; font-variant-numeric: tabular-nums; min-width: 42px; text-align: right;">${eq.qualified}%</span>
+                    </div>
+                </td>
+            `;
+            tbody.appendChild(tr);
+        });
+
+        // ===== 报警列表渲染 =====
+        const alarmList = document.getElementById('alarmList');
+        alarmData.forEach(alarm => {
+            const levelMap = { critical: '紧急', warning: '警告', info: '提示' };
+            const div = document.createElement('div');
+            div.className = `alarm-item ${alarm.level}`;
+            div.innerHTML = `
+                <span class="alarm-level ${alarm.level}">${levelMap[alarm.level]}</span>
+                <div class="alarm-content">
+                    <div class="alarm-text">${alarm.text}</div>
+                    <div class="alarm-device">${alarm.device}</div>
+                </div>
+                <span class="alarm-time">${alarm.time}</span>
+            `;
+            alarmList.appendChild(div);
+        });
+
+        // ===== 模拟数据刷新（产量微波动） =====
+        function simulateDataUpdate() {
+            // KPI 微变
+            const prodEl = document.getElementById('kpiProduction');
+            const base = 12847;
+            const newVal = base + Math.floor(Math.random() * 20 - 5);
+            prodEl.innerHTML = `${newVal.toLocaleString()}<span class="kpi-unit">件</span>`;
+        }
+        setInterval(simulateDataUpdate, 5000);
+    </script>
+</body>
+</html>
