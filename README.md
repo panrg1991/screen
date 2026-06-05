@@ -20,7 +20,7 @@
 ## 项目结构
 
 ```
-d:\weixin\screen\
+d:\weixin\
 ├── pages\
 │   ├── index\          # 首页：难度选择 + 关卡入口
 │   ├── game\           # 游戏主页面：核心玩法
@@ -46,7 +46,7 @@ d:\weixin\screen\
 
 1. 下载安装 [微信开发者工具](https://developers.weixin.qq.com/miniprogram/dev/devtools/download.html)
 2. 打开工具 → 「导入项目」
-3. 目录选择 `d:\weixin\screen`
+3. 目录选择 `d:\weixin`
 4. AppID 选择 **「测试号」** 或填写你自己的小程序 AppID
 5. 点击「编译」即可预览
 
