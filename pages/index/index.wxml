@@ -1,0 +1,135 @@
+<view class="container">
+  <!-- 背景装饰 -->
+  <view class="bg-decoration">
+    <view class="bg-circle c1"></view>
+    <view class="bg-circle c2"></view>
+    <view class="bg-circle c3"></view>
+  </view>
+
+  <!-- 标题区域 -->
+  <view class="title-section">
+    <view class="game-icon">
+      <view class="block b1"></view>
+      <view class="block b2"></view>
+      <view class="block b3"></view>
+    </view>
+    <text class="title">积木堆叠</text>
+    <text class="subtitle">STACK MASTER</text>
+  </view>
+
+  <!-- 难度选择 -->
+  <view class="section">
+    <text class="section-title">选择难度</text>
+    <view class="difficulty-list">
+      <view
+        class="difficulty-item {{currentDifficulty === 'easy' ? 'active' : ''}}"
+        bindtap="selectDifficulty"
+        data-difficulty="easy"
+      >
+        <view class="diff-icon easy-icon">😊</view>
+        <text class="diff-name">简单</text>
+        <text class="diff-desc">积木大·速度慢</text>
+      </view>
+      <view
+        class="difficulty-item {{currentDifficulty === 'normal' ? 'active' : ''}}"
+        bindtap="selectDifficulty"
+        data-difficulty="normal"
+      >
+        <view class="diff-icon normal-icon">😐</view>
+        <text class="diff-name">容易</text>
+        <text class="diff-desc">积木中·速度中</text>
+      </view>
+      <view
+        class="difficulty-item {{currentDifficulty === 'hard' ? 'active' : ''}}"
+        bindtap="selectDifficulty"
+        data-difficulty="hard"
+      >
+        <view class="diff-icon hard-icon">😈</view>
+        <text class="diff-name">困难</text>
+        <text class="diff-desc">积木小·速度快</text>
+      </view>
+    </view>
+  </view>
+
+  <!-- 关卡选择 -->
+  <view class="section">
+    <text class="section-title">选择关卡</text>
+    <view class="level-list">
+      <view
+        class="level-item {{unlockedLevels[currentDifficulty] >= 1 ? '' : 'locked'}} {{currentLevel === 1 ? 'active' : ''}}"
+        bindtap="selectLevel"
+        data-level="1"
+      >
+        <view class="level-num">1</view>
+        <text class="level-label">初级</text>
+        <text class="level-target">10层</text>
+        <view class="level-best" wx:if="{{bestScores[currentDifficulty].level1 > 0}}">
+          <text>🏆 {{bestScores[currentDifficulty].level1}}</text>
+        </view>
+        <view class="lock-icon" wx:if="{{unlockedLevels[currentDifficulty] < 1}}">🔒</view>
+      </view>
+
+      <view class="level-arrow" wx:if="{{unlockedLevels[currentDifficulty] >= 2}}">→</view>
+      <view class="level-arrow locked-arrow" wx:else>🔒</view>
+
+      <view
+        class="level-item {{unlockedLevels[currentDifficulty] >= 2 ? '' : 'locked'}} {{currentLevel === 2 ? 'active' : ''}}"
+        bindtap="selectLevel"
+        data-level="2"
+      >
+        <view class="level-num">2</view>
+        <text class="level-label">中级</text>
+        <text class="level-target">15层</text>
+        <view class="level-best" wx:if="{{bestScores[currentDifficulty].level2 > 0}}">
+          <text>🏆 {{bestScores[currentDifficulty].level2}}</text>
+        </view>
+        <view class="lock-icon" wx:if="{{unlockedLevels[currentDifficulty] < 2}}">🔒</view>
+      </view>
+
+      <view class="level-arrow" wx:if="{{unlockedLevels[currentDifficulty] >= 3}}">→</view>
+      <view class="level-arrow locked-arrow" wx:else>🔒</view>
+
+      <view
+        class="level-item {{unlockedLevels[currentDifficulty] >= 3 ? '' : 'locked'}} {{currentLevel === 3 ? 'active' : ''}}"
+        bindtap="selectLevel"
+        data-level="3"
+      >
+        <view class="level-num">3</view>
+        <text class="level-label">高级</text>
+        <text class="level-target">20层</text>
+        <view class="level-best" wx:if="{{bestScores[currentDifficulty].level3 > 0}}">
+          <text>🏆 {{bestScores[currentDifficulty].level3}}</text>
+        </view>
+        <view class="lock-icon" wx:if="{{unlockedLevels[currentDifficulty] < 3}}">🔒</view>
+      </view>
+    </view>
+  </view>
+
+  <!-- 开始按钮 -->
+  <view class="start-btn" bindtap="startGame">
+    <text>开始游戏</text>
+  </view>
+
+  <!-- 底部信息 -->
+  <view class="footer">
+    <text class="footer-text" bindtap="showHelp">游戏说明</text>
+  </view>
+
+  <!-- 帮助弹窗 -->
+  <view class="modal-mask" wx:if="{{showHelpModal}}" bindtap="hideHelp">
+    <view class="modal-content" catchtap="">
+      <text class="modal-title">游戏说明</text>
+      <view class="help-list">
+        <text class="help-item">🎯 点击屏幕将滑来的积木放置在塔上</text>
+        <text class="help-item">✨ 对齐越精准，得分越高</text>
+        <text class="help-item">💎 完美对齐（偏差极小）获得额外奖励</text>
+        <text class="help-item">⚠️ 偏差过大，积木会被切掉超出部分</text>
+        <text class="help-item">💀 积木完全未对齐，游戏结束</text>
+        <text class="help-item">🏆 通关后解锁下一关卡</text>
+      </view>
+      <view class="modal-btn" bindtap="hideHelp">
+        <text>知道了</text>
+      </view>
+    </view>
+  </view>
+</view>

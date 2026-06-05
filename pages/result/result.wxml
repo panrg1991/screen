@@ -1,0 +1,71 @@
+<view class="container">
+  <!-- 背景装饰 -->
+  <view class="bg-decoration">
+    <view class="bg-circle c1"></view>
+    <view class="bg-circle c2"></view>
+  </view>
+
+  <!-- 结果内容 -->
+  <view class="result-content">
+    <!-- 图标 -->
+    <view class="result-icon">
+      <text class="icon-text">{{isWin ? '🎉' : '😢'}}</text>
+    </view>
+
+    <!-- 标题 -->
+    <text class="result-title">{{isWin ? '恭喜通关!' : '游戏结束'}}</text>
+    <text class="result-subtitle" wx:if="{{isWin}}">第 {{level}} 关 · {{difficultyName}}</text>
+
+    <!-- 得分卡片 -->
+    <view class="score-card">
+      <view class="score-main">
+        <text class="score-label">最终得分</text>
+        <text class="score-value">{{score}}</text>
+      </view>
+
+      <view class="score-details">
+        <view class="detail-item">
+          <text class="detail-value">{{currentLayer}}</text>
+          <text class="detail-label">堆叠层数</text>
+        </view>
+        <view class="detail-divider"></view>
+        <view class="detail-item">
+          <text class="detail-value">{{perfectCount}}</text>
+          <text class="detail-label">完美次数</text>
+        </view>
+        <view class="detail-divider"></view>
+        <view class="detail-item">
+          <text class="detail-value">{{combo}}</text>
+          <text class="detail-label">最高连击</text>
+        </view>
+      </view>
+
+      <!-- 星级评价（通关时显示） -->
+      <view class="stars" wx:if="{{isWin}}">
+        <text class="star {{perfectCount >= 5 ? 'active' : ''}}">★</text>
+        <text class="star {{perfectCount >= 10 ? 'active' : ''}}">★</text>
+        <text class="star {{perfectCount >= 15 ? 'active' : ''}}">★</text>
+      </view>
+
+      <!-- 新纪录提示 -->
+      <view class="new-best" wx:if="{{isNewBest}}">
+        <text>🎉 新纪录!</text>
+      </view>
+    </view>
+
+    <!-- 操作按钮 -->
+    <view class="action-btns">
+      <view class="action-btn primary-btn" bindtap="playAgain">
+        <text>{{isWin && level < 3 ? '下一关' : '再来一次'}}</text>
+      </view>
+      <view class="action-btn secondary-btn" bindtap="goHome">
+        <text>返回首页</text>
+      </view>
+    </view>
+
+    <!-- 分享按钮 -->
+    <button class="share-btn" open-type="share">
+      <text>📤 分享给好友</text>
+    </button>
+  </view>
+</view>
